@@ -1,16 +1,21 @@
 // server.js
 const express = require('express');
-const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
-
 const app = express();
+
 app.use(express.json());
 
-// --- Chat endpoint ---
+// Health check
+app.get('/', (_, res) => res.send('✅ Smll Me Chat API is running'));
+
+// Quick check
+app.get('/chat', (_, res) => res.json({ ok: true, msg: 'Use POST /chat with {message}' }));
+
+// Real endpoint
 app.post('/chat', async (req, res) => {
   try {
-    const userMessage = (req.body?.message || '').toString().slice(0, 2000);
+    const userMessage = String(req.body?.message || '').slice(0, 2000);
 
-    const r = await fetch('https://api.openai.com/v1/responses', {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -18,43 +23,27 @@ app.post('/chat', async (req, res) => {
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        input: [
-          { role: 'system', content: 'You are a friendly aromatherapy assistant for Smll Me.' },
+        messages: [
+          { role: 'system', content: 'You are a friendly aromatherapy assistant for Smll Me. Be helpful and safe.' },
           { role: 'user', content: userMessage }
         ]
       })
     });
 
     const data = await r.json();
+    console.log('🔎 OpenAI API response:', JSON.stringify(data, null, 2));
+
     const reply =
-      data.output_text ||
-      data.choices?.[0]?.message?.content ||
-      'Sorry, I had trouble responding.';
+      data?.choices?.[0]?.message?.content ??
+      data?.error?.message ??
+      'Sorry, I had trouble.';
     res.json({ reply });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Server error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// --- Default route ---
-app.get('/', (req, res) => {
-  res.send('✅ Smll Me Chat API is running');
-});
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-3~/ server.js
-const express = require('express');
-const app = express();
-
-app.get('/', (req, res) => {
-  res.json({ ok: true, message: 'Hello from Express server!' });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
-
 
